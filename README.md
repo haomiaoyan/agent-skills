@@ -24,6 +24,8 @@ node scripts/install.mjs --list     # 先看看有什么
 | `--validate` | 只校验，不安装 |
 | `--dest <dir>` | 指定目标目录 |
 | `--only a,b` | 只装指定技能**或分类**（写分类名装整类，如 `--only planning`） |
+| `--topic a,b` | 按主题安装（主题定义在 `topics/catalog.json`） |
+| `--list-topics` | 列出主题与命中数 |
 | `--link` | 建符号链接而非复制（改仓库即时生效；Windows 建 junction，无需管理员） |
 | `--force` | 覆盖已存在的同名技能 |
 
@@ -70,6 +72,14 @@ agent-skills/
 │           └── grill-me/           指向 grilling 的转发壳
 ├── scripts/
 │   └── install.mjs                 安装 / 校验 / 列举（零依赖）
+├── topics/                          【主题索引】按领域检索的第二维度
+│   ├── catalog.json                机器可读的主题映射（唯一数据源）
+│   ├── README.md                   两套维度的说明
+│   ├── ui-design/README.md         UI 设计（1 个）
+│   ├── web-design/README.md        网页设计（2 个）
+│   ├── ai-image/README.md          AI 绘图（当前 0 个）
+│   ├── ai-video/README.md          AI 视频（当前 0 个）
+│   └── workflow/README.md          工程流程（5 个）
 ├── .github/workflows/
 │   └── validate.yml                push 时自动校验
 ├── docs/
@@ -80,6 +90,23 @@ agent-skills/
 **分类是仓库里的组织方式，不是安装后的结构**：安装器把六个技能平铺到目标目录（运行时认技能名，不认分类）。分类目录本身只有 README.md，不含 SKILL.md，不会被误当成技能。
 
 安装器同时遍历 `skills/<分类>/<技能>/` 和 `third-party/*/skills/`，对使用者没有区别；分目录只是为了让阶段归属与版权归属都清楚。
+
+## 两套分类维度
+
+| 维度 | 位置 | 回答的问题 |
+|---|---|---|
+| 按阶段（主，物理） | `skills/planning/`、`delivery/`、`verification/` | 「什么时候用」 |
+| 按主题（次，逻辑） | [`topics/`](topics/README.md) | 「属于哪个领域」 |
+
+**主题不是物理文件夹**：一个技能目录无法同时位于 `delivery/` 和 `web-design/`，复制或软链接都会带来同步/跨平台问题。所以主题用 [`topics/catalog.json`](topics/catalog.json) 做索引，技能本体保持单份。一个技能可以挂多个主题。
+
+```bash
+node scripts/install.mjs --list-topics         # UI 设计 / 网页设计 / AI 绘图 / AI 视频 / 工程流程
+node scripts/install.mjs --topic web-design   # 装该主题下全部技能
+node scripts/install.mjs --topic workflow --only plan-sds-review   # 与 --only 取交集
+```
+
+`AI 绘图` 与 `AI 视频` 目前是**空类目**（如实记录，不是遗漏）：本仓库的方法论来自 NEUROATLAS 实战，那次没有用到图像/视频生成。两份 README 写清了本地已有的相关能力、未收录原因、以及以后怎么补。
 
 ## 已有技能
 
@@ -116,9 +143,10 @@ node scripts/install.mjs --only grill-me,grilling
 2. 建 `skills/<分类>/<kebab-case-name>/SKILL.md`
 3. frontmatter 至少写 `name`（与目录名一致）和 `description`（以 `Use when...` 开头，说明**何时**用，不要复述流程）
 4. 在该分类的 `README.md` 表格里补一行
-5. 跑 `node scripts/install.mjs --validate`，通过后提交
+5. 在 [`topics/catalog.json`](topics/catalog.json) 里把技能名加到对应主题的 `skills` 数组（可加多个主题）
+6. 跑 `node scripts/install.mjs --validate`，通过后提交（校验会检查主题里写的技能名是否真实存在）
 
-细则见 [`docs/structure.md`](docs/structure.md)。
+细则见 [`docs/structure.md`](docs/structure.md) 与 [`topics/README.md`](topics/README.md)。
 
 ## 更新
 

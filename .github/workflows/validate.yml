@@ -18,6 +18,9 @@ jobs:
       - name: 校验技能结构与引用
         run: node scripts/install.mjs --validate
 
+      - name: 校验主题索引
+        run: node scripts/install.mjs --list-topics
+
       - name: 安装到临时目录并抽查
         run: |
           node scripts/install.mjs --dest "$RUNNER_TEMP/skills-out"

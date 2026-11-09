@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "note": "主题是检索维度，不改变技能的物理位置。技能本体仍在 skills/<阶段>/<技能名>/ 与 third-party/。本文件是主题映射的唯一数据源，安装器的 --topic 与校验都读它。",
+  "dimensions": {
+    "primary": "按阶段：skills/planning|delivery|verification/（物理目录，决定归档位置）",
+    "secondary": "按主题：本文件定义的 topics（逻辑标签，决定检索与筛选）"
+  },
+  "topics": [
+    {
+      "slug": "ui-design",
+      "name": "UI 设计",
+      "description": "界面视觉、组件规范、设计 tokens、排版与配色、反模板化审美",
+      "skills": ["visual-narrative-site"]
+    },
+    {
+      "slug": "web-design",
+      "name": "网页设计",
+      "description": "网页/落地页/长滚动叙事站的构建、动效、响应式与可交付验收",
+      "skills": ["visual-narrative-site", "web-acceptance-harness"]
+    },
+    {
+      "slug": "ai-image",
+      "name": "AI 绘图",
+      "description": "文生图、图生图、社媒配图、素材检索与图像生成流水线",
+      "skills": []
+    },
+    {
+      "slug": "ai-video",
+      "name": "AI 视频",
+      "description": "视频生成、录屏取证、动效序列、实况照片与视频转卡片",
+      "skills": []
+    },
+    {
+      "slug": "workflow",
+      "name": "工程流程",
+      "description": "立项提问、计划与规格审核、验收纪律、交付闸门等跨项目方法论",
+      "skills": ["plan-sds-review", "plan-me", "grilling", "grill-me", "web-acceptance-harness"]
+    }
+  ]
+}

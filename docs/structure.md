@@ -1,6 +1,15 @@
 # 技能目录约定
 
-本仓库的每个技能遵循同一套结构约定。
+本仓库的每个技能遵循同一套结构约定。**有两套并行的分类维度**：按阶段（物理归档）与按主题（逻辑索引）。
+
+## 两套维度
+
+| 维度 | 位置 | 回答 | 是否物理目录 |
+|---|---|---|---|
+| 阶段（主） | `skills/planning/`、`delivery/`、`verification/` | 什么时候用 | 是，技能本体在这里 |
+| 主题（次） | `topics/<slug>/` + `topics/catalog.json` | 属于哪个领域 | 否，只是索引 |
+
+**主题不做成物理目录**：文件系统是树，一个技能不能同时位于两个阶段目录和一个主题目录。复制会产生不同步的副本，软链接在 Windows/Git 上行为不一致。因此主题用 `catalog.json` 映射，技能本体保持单份，一个技能可挂多个主题。
 
 ## 一个技能 = 一个目录
 
@@ -80,6 +89,30 @@ skills/planning/<alias>/      ← 壳，指向实体
 - 壳和实体必须同时安装，安装器不解析依赖
 - 壳也要写 `license` / `author`（它的版权归属与实体一致）
 
+## 主题索引约定
+
+`topics/catalog.json` 是唯一数据源，结构：
+
+```json
+{
+  "topics": [
+    { "slug": "ui-design", "name": "UI 设计", "description": "...", "skills": ["visual-narrative-site"] },
+    { "slug": "ai-image",  "name": "AI 绘图", "description": "...", "skills": [] }
+  ]
+}
+```
+
+| 约束 | 由谁检查 |
+|---|---|
+| `slug` 只含小写字母/数字/连字符，且不重复 | `--validate` |
+| 每个 `slug` 必须有 `topics/<slug>/README.md` | `--validate` |
+| `skills` 里的名字必须能在阶段目录或 `third-party/` 找到 | `--validate` |
+| `skills: []` 合法（空类目），但 README 必须写明「当前 0 个」的原因与补齐方式 | 人工 |
+
+每个主题 README 写清：本主题收了哪些技能及归到这里的理由、本地有但按版权规则没收录的相关能力、怎么补这一类、按主题安装的命令。**不要为凑类目造空壳技能**——没有实测支撑的技能不写。
+
+`--topic` 与 `--only` 取交集；`--topic` 多个主题取并集。
+
 ## SKILL.md 的 frontmatter
 
 ```yaml
@@ -134,6 +167,7 @@ node scripts/install.mjs --validate
 - `description` 未超长、以 `Use when` 开头（缺前缀只告警）
 - 正文里 `` `references/xxx` `` / `` `assets/xxx` `` 形式的引用，文件真实存在
 - 文件无 UTF-8 BOM（有则告警：部分运行时解析 frontmatter 会失败）
+- `topics/catalog.json` 可解析；主题 slug 合法且不重复；每个主题有 README；引用的技能名真实存在
 
 任一项失败则退出码非 0，CI 会拦住。
 

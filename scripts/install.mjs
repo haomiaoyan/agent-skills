@@ -7,10 +7,12 @@
  *   node scripts/install.mjs --dest <dir>         # 指定目标目录
  *   node scripts/install.mjs --link               # 用符号链接（改仓库即生效，需权限）
  *   node scripts/install.mjs --only a,b           # 只装指定技能或分类（写分类名装整类）
+ *   node scripts/install.mjs --topic a,b          # 按主题装（主题定义在 topics/catalog.json）
+ *   node scripts/install.mjs --list-topics        # 列出主题与命中数
  *   node scripts/install.mjs --force              # 覆盖已存在的同名技能
  *   node scripts/install.mjs --validate           # 只校验，不安装
  *
- * 自有技能分类存放：skills/<分类>/<技能名>/，分类见各分类下的 README.md。
+ * 两套分类维度：skills/<阶段>/<技能>/ 是物理归档，topics/ 是主题索引。
  * 安装时一律平铺到目标目录（目标运行时认的是技能名，不认分类）。
  *
  * 目标目录默认：Windows = %USERPROFILE%\.agents\skills，其它 = ~/.agents/skills
@@ -26,6 +28,7 @@ import os from 'node:os';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SKILLS_DIR = join(ROOT, 'skills');
 const THIRD_PARTY_DIR = join(ROOT, 'third-party');
+const CATALOG_PATH = join(ROOT, 'topics', 'catalog.json');
 
 const argv = process.argv.slice(2);
 const has = (f) => argv.includes(f);
@@ -125,6 +128,47 @@ function scanSkillDirs() {
   return out;
 }
 
+/** 读取主题索引；文件缺失或 JSON 损坏时返回 null（由调用方决定如何报错） */
+function loadCatalog() {
+  if (!existsSync(CATALOG_PATH)) return null;
+  try {
+    return JSON.parse(readFileSync(CATALOG_PATH, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 校验主题索引一致性：
+ * - slug 必须与 topics/<slug>/README.md 对应
+ * - 引用的技能名必须真实存在（防止写错名字或指向已删除的技能）
+ * 返回错误数组，空表示一致。
+ */
+function validateCatalog(entries) {
+  const problems = [];
+  const catalog = loadCatalog();
+  if (!catalog) {
+    problems.push(`主题索引缺失或损坏：topics/catalog.json`);
+    return { problems, catalog: null };
+  }
+  const known = new Set(entries.map((e) => e.name));
+  const seenSlugs = new Set();
+  for (const t of catalog.topics || []) {
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(t.slug || '')) {
+      problems.push(`主题 slug 格式不合法：${t.slug}`);
+    }
+    if (seenSlugs.has(t.slug)) problems.push(`主题 slug 重复：${t.slug}`);
+    seenSlugs.add(t.slug);
+    if (!existsSync(join(ROOT, 'topics', t.slug, 'README.md'))) {
+      problems.push(`主题 ${t.slug} 缺少 topics/${t.slug}/README.md`);
+    }
+    for (const name of t.skills || []) {
+      if (!known.has(name)) problems.push(`主题 ${t.slug} 引用了不存在的技能：${name}`);
+    }
+  }
+  return { problems, catalog };
+}
+
 /** 校验单个技能，返回 { name, description, problems[], warnings[] } */
 function checkSkill(dirName, dir = join(SKILLS_DIR, dirName)) {
   const skillMd = join(dir, 'SKILL.md');
@@ -188,13 +232,19 @@ function validateAll(quiet = false) {
     if (!quiet) ws.forEach((w) => warn(`${tag}${e.name}：${w}`));
     warned += ws.length;
   }
+  const cat = validateCatalog(entries);
+  for (const p of cat.problems) {
+    bad += 1;
+    fail(`[catalog] ${p}`);
+  }
   if (bad) {
-    console.log(`\n校验失败：${bad}/${entries.length} 个技能有问题`);
+    console.log(`\n校验失败：${bad} 项问题`);
     return 1;
   }
   if (!quiet) {
     const own = entries.filter((e) => e.origin === 'own').length;
-    console.log(`\n校验通过：${entries.length} 个技能（自有 ${own}，第三方 ${entries.length - own}）`);
+    const topicCount = cat.catalog?.topics?.length ?? 0;
+    console.log(`\n校验通过：${entries.length} 个技能（自有 ${own}，第三方 ${entries.length - own}），${topicCount} 个主题`);
   }
   return 0;
 }
@@ -208,6 +258,8 @@ function install() {
   const useLink = has('--link');
   const force = has('--force');
   const only = val('--only')?.split(',').map((s) => s.trim()).filter(Boolean);
+  const topics = val('--topic')?.split(',').map((s) => s.trim()).filter(Boolean);
+  const catalog = loadCatalog();
 
   const code = validateAll(true);
   if (code !== 0) {
@@ -217,6 +269,23 @@ function install() {
   }
 
   let entries = scanSkillDirs();
+
+  // --topic：按主题筛（与 --only 取交集）
+  if (topics) {
+    const bySlug = new Map((catalog?.topics || []).map((t) => [t.slug, t]));
+    const missing = topics.filter((t) => !bySlug.has(t));
+    if (missing.length) {
+      fail(`--topic 指定了不存在的主题：${missing.join(', ')}（用 --list-topics 查看）`);
+      return 1;
+    }
+    const wanted = new Set(topics.flatMap((t) => bySlug.get(t).skills || []));
+    if (wanted.size === 0) {
+      console.log(`主题 ${topics.join(', ')} 当前没有收录任何技能，无需安装。`);
+      return 0;
+    }
+    entries = entries.filter((e) => wanted.has(e.name));
+  }
+
   if (only) {
     // --only 既能写技能名，也能写分类名（一次装整类）
     const knownCategories = new Set(entries.map((e) => e.category).filter(Boolean));
@@ -277,6 +346,23 @@ if (has('--list')) {
     const tag = e.origin === 'third-party' ? '[third-party] ' : e.category ? `[${e.category}] ` : '';
     console.log(`${tag}${r.name}${r.version ? ' @' + r.version : ''}`);
     console.log(`  ${r.description.slice(0, 110)}${r.description.length > 110 ? '…' : ''}\n`);
+  }
+  process.exit(0);
+}
+
+if (has('--list-topics')) {
+  const catalog = loadCatalog();
+  if (!catalog) {
+    fail('主题索引缺失或损坏：topics/catalog.json');
+    process.exit(1);
+  }
+  const entries = scanSkillDirs();
+  const known = new Set(entries.map((e) => e.name));
+  for (const t of catalog.topics || []) {
+    const hit = (t.skills || []).filter((n) => known.has(n)).length;
+    console.log(`${t.slug.padEnd(14)} ${t.name}  —  ${hit} 个技能`);
+    console.log(`  ${t.description}`);
+    console.log(`  ${(t.skills || []).join(', ') || '（当前为空）'}\n`);
   }
   process.exit(0);
 }
