@@ -50,28 +50,47 @@ cp -r skills/visual-narrative-site ~/.agents/skills/
 
 ```
 agent-skills/
-├── skills/                     技能本体，一个目录一个技能
+├── skills/                     自有技能，一个目录一个技能
 │   ├── visual-narrative-site/
 │   │   ├── SKILL.md            主文件（frontmatter + 流程正文）
 │   │   ├── references/         按需加载的参考文档
 │   │   └── assets/             可复制的代码模板
-│   └── web-acceptance-harness/
-│       └── SKILL.md            单文件技能
+│   ├── web-acceptance-harness/
+│   │   └── SKILL.md            单文件技能
+│   ├── plan-sds-review/        计划与 SDS 审核流程（来源待确认，见其 README）
+│   └── plan-me/                指向 plan-sds-review 的转发壳
+├── third-party/                第三方技能，保留原作者许可
+│   └── mattpocock-skills/
+│       ├── LICENSE             MIT, Copyright (c) 2026 Matt Pocock
+│       ├── README.md           来源与收录说明
+│       └── skills/
+│           ├── grilling/       决策树分轮提问（实体）
+│           └── grill-me/       指向 grilling 的转发壳
 ├── scripts/
 │   └── install.mjs             安装 / 校验 / 列举（零依赖）
 ├── .github/workflows/
 │   └── validate.yml            push 时自动校验
 ├── docs/
 │   └── structure.md            技能目录约定与撰写规则
-└── LICENSE
+└── LICENSE                     MIT（仅覆盖自有技能）
 ```
+
+安装器同时遍历 `skills/` 和 `third-party/*/skills/`，对使用者没有区别；分目录只是为了让版权归属清楚。
 
 ## 已有技能
 
-| 技能 | 用途 | 形态 |
-|---|---|---|
-| [`visual-narrative-site`](skills/visual-narrative-site/) | 多章节长滚动 / 交互可视化网站的交付流程：立项提问 → 计划 → 独立审核 → 实测校正 → 分批实施；含 22 条实测坑与运行时测量配方 | 多文件（4 references + 4 assets） |
-| [`web-acceptance-harness`](skills/web-acceptance-harness/) | 可判定的 Web 验收脚本：四层验收体系、六种测量技术、五个状态隔离陷阱、断言必须能失败的纪律 | 单文件 |
+| 技能 | 用途 | 形态 | 许可 |
+|---|---|---|---|
+| [`visual-narrative-site`](skills/visual-narrative-site/) | 多章节长滚动 / 交互可视化网站的交付流程：立项提问 → 计划 → 独立审核 → 实测校正 → 分批实施；含 22 条实测坑与运行时测量配方 | 多文件（4 references + 4 assets） | MIT |
+| [`web-acceptance-harness`](skills/web-acceptance-harness/) | 可判定的 Web 验收脚本：四层验收体系、六种测量技术、五个状态隔离陷阱、断言必须能失败的纪律 | 单文件 | MIT |
+| [`plan-sds-review`](skills/plan-sds-review/) | 计划与 SDS 审核流程：八阶段流水线，含审核 prompt 模板、失败模式清单、CDP 测量配方 | 多文件（4 references） | **来源待确认** |
+| [`plan-me`](skills/plan-me/) | `plan-sds-review` 的短入口（用户显式输入 `/plan-me` 才会触发） | 转发壳 | **来源待确认** |
+| [`grilling`](third-party/mattpocock-skills/skills/grilling/) | 针对计划/决策做 relentless 分轮提问，把决策画成树 | 单文件 | MIT (Matt Pocock) |
+| [`grill-me`](third-party/mattpocock-skills/skills/grill-me/) | `grilling` 的短入口（用户显式输入 `/grill-me` 才会触发） | 转发壳 | MIT (Matt Pocock) |
+
+### 关于「来源待确认」
+
+`plan-sds-review` 与 `plan-me` 未能追溯到上游仓库：GitHub 代码搜索 0 命中，`obra/superpowers`、`mattpocock/skills`、npm `superpowers-zh` 三个公开来源里都没有。因此**没有给它们加 `license` / `author` 字段**，根目录 MIT 也不覆盖它们。详见 [`skills/plan-sds-review/README.md`](skills/plan-sds-review/README.md)。
 
 ## 加一个新技能
 
@@ -91,4 +110,15 @@ node scripts/install.mjs --force     # 复制模式
 
 ## License
 
-MIT，见 [LICENSE](LICENSE)。
+根目录 MIT（见 [LICENSE](LICENSE)）**只覆盖自有技能**：
+
+- `skills/visual-narrative-site/`
+- `skills/web-acceptance-harness/`
+- `scripts/`、`docs/`、`README.md`
+
+以下不适用根目录 MIT：
+
+| 路径 | 许可 |
+|---|---|
+| `third-party/mattpocock-skills/` | MIT，Copyright (c) 2026 Matt Pocock（见该目录 LICENSE） |
+| `skills/plan-sds-review/`、`skills/plan-me/` | 来源待确认，未声明许可 |

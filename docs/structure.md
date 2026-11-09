@@ -4,6 +4,8 @@
 
 ## 一个技能 = 一个目录
 
+自有技能放 `skills/<name>/`，第三方技能放 `third-party/<vendor>/skills/<name>/`。
+
 ```
 skills/<name>/
 ├── SKILL.md              必需
@@ -13,6 +15,17 @@ skills/<name>/
 ```
 
 目录名用 kebab-case，且**必须与 frontmatter 的 `name` 完全一致**。校验脚本会检查这一点。
+
+### 自有 vs 第三方的分界
+
+| | 自有 | 第三方 |
+|---|---|---|
+| 位置 | `skills/` | `third-party/<vendor>/skills/` |
+| frontmatter | 需要 `license` / `metadata.author` | 保持上游原样，不改他人文案 |
+| `description` 前缀 | 建议 `Use when...` | 不强制（不改原文） |
+| LICENSE | 由根目录 MIT 覆盖 | 该 vendor 目录内单独放一份原文 |
+
+判断依据是**版权归属**，不是文件来源。从别人仓库拉的、或来源查不到的，一律不放 `skills/`。来源无法确认的技能不要加 `license` / `author` 字段——写了就是伪造署名。
 
 ## SKILL.md 的 frontmatter
 

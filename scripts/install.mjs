@@ -22,6 +22,7 @@ import os from 'node:os';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SKILLS_DIR = join(ROOT, 'skills');
+const THIRD_PARTY_DIR = join(ROOT, 'third-party');
 
 const argv = process.argv.slice(2);
 const has = (f) => argv.includes(f);
@@ -61,15 +62,50 @@ function parseFrontmatter(text) {
 }
 
 function listSkillDirs() {
-  if (!existsSync(SKILLS_DIR)) return [];
-  return readdirSync(SKILLS_DIR)
-    .filter((d) => statSync(join(SKILLS_DIR, d)).isDirectory())
-    .sort();
+  return scanSkillDirs().map((e) => e.name);
+}
+
+/**
+ * 扫描自有技能与第三方技能，返回 [{ name, dir, origin }]。
+ * - skills/<name>/                       → origin: 'own'
+ * - third-party/<vendor>/skills/<name>/  → origin: 'third-party'
+ * 同名时自有优先（安装到目标目录会发生冲突，第三方先被跳过并告警）。
+ */
+function scanSkillDirs() {
+  const out = [];
+  const seen = new Set();
+
+  const push = (name, dir, origin) => {
+    if (seen.has(name)) return;
+    seen.add(name);
+    out.push({ name, dir, origin });
+  };
+
+  if (existsSync(SKILLS_DIR)) {
+    readdirSync(SKILLS_DIR)
+      .filter((d) => statSync(join(SKILLS_DIR, d)).isDirectory())
+      .sort()
+      .forEach((d) => push(d, join(SKILLS_DIR, d), 'own'));
+  }
+
+  if (existsSync(THIRD_PARTY_DIR)) {
+    readdirSync(THIRD_PARTY_DIR)
+      .map((v) => join(THIRD_PARTY_DIR, v, 'skills'))
+      .filter((p) => existsSync(p))
+      .sort()
+      .forEach((vendorSkills) => {
+        readdirSync(vendorSkills)
+          .filter((d) => statSync(join(vendorSkills, d)).isDirectory())
+          .sort()
+          .forEach((d) => push(d, join(vendorSkills, d), 'third-party'));
+      });
+  }
+
+  return out;
 }
 
 /** 校验单个技能，返回 { name, description, problems[], warnings[] } */
-function checkSkill(dirName) {
-  const dir = join(SKILLS_DIR, dirName);
+function checkSkill(dirName, dir = join(SKILLS_DIR, dirName)) {
   const skillMd = join(dir, 'SKILL.md');
   const problems = [];
   const warnings = [];
@@ -110,27 +146,35 @@ function checkSkill(dirName) {
 }
 
 function validateAll(quiet = false) {
-  const dirs = listSkillDirs();
-  if (!dirs.length) {
-    fail('skills/ 下没有任何技能目录');
+  const entries = scanSkillDirs();
+  if (!entries.length) {
+    fail('skills/ 与 third-party/*/skills/ 下都没有技能目录');
     return 1;
   }
   let bad = 0;
-  for (const d of dirs) {
-    const r = checkSkill(d);
+  let warned = 0;
+  for (const e of entries) {
+    const r = checkSkill(e.name, e.dir);
+    const tag = e.origin === 'third-party' ? '[third-party] ' : '';
     if (r.problems.length) {
       bad += 1;
-      fail(`${d}：${r.problems.join('；')}`);
+      fail(`${tag}${e.name}：${r.problems.join('；')}`);
     } else if (!quiet) {
-      ok(`${d}（description ${r.description.length} 字符）`);
+      ok(`${tag}${e.name}（description ${r.description.length} 字符）`);
     }
-    if (!quiet) r.warnings.forEach((w) => warn(`${d}：${w}`));
+    // 第三方技能的 description 未以 Use when 开头属正常（原样收录，不改他人文案）
+    const ws = e.origin === 'third-party' ? r.warnings.filter((w) => !w.includes('Use when')) : r.warnings;
+    if (!quiet) ws.forEach((w) => warn(`${tag}${e.name}：${w}`));
+    warned += ws.length;
   }
   if (bad) {
-    console.log(`\n校验失败：${bad}/${dirs.length} 个技能有问题`);
+    console.log(`\n校验失败：${bad}/${entries.length} 个技能有问题`);
     return 1;
   }
-  if (!quiet) console.log(`\n校验通过：${dirs.length} 个技能`);
+  if (!quiet) {
+    const own = entries.filter((e) => e.origin === 'own').length;
+    console.log(`\n校验通过：${entries.length} 个技能（自有 ${own}，第三方 ${entries.length - own}）`);
+  }
   return 0;
 }
 
@@ -151,26 +195,27 @@ function install() {
     return 1;
   }
 
-  let dirs = listSkillDirs();
+  let entries = scanSkillDirs();
   if (only) {
-    const missing = only.filter((n) => !dirs.includes(n));
+    const missing = only.filter((n) => !entries.some((e) => e.name === n));
     if (missing.length) {
       fail(`--only 指定了不存在的技能：${missing.join(', ')}`);
       return 1;
     }
-    dirs = dirs.filter((d) => only.includes(d));
+    entries = entries.filter((e) => only.includes(e.name));
   }
 
   mkdirSync(dest, { recursive: true });
   console.log(`安装到：${dest}${useLink ? '（符号链接模式）' : ''}\n`);
 
   let installed = 0;
-  for (const d of dirs) {
-    const src = join(SKILLS_DIR, d);
-    const target = join(dest, d);
+  for (const e of entries) {
+    const src = e.dir;
+    const target = join(dest, e.name);
+    const tag = e.origin === 'third-party' ? '[third-party] ' : '';
     if (existsSync(target)) {
       if (!force) {
-        warn(`${d}：目标已存在，跳过（加 --force 覆盖）`);
+        warn(`${tag}${e.name}：目标已存在，跳过（加 --force 覆盖）`);
         continue;
       }
       rmSync(target, { recursive: true, force: true });
@@ -178,18 +223,18 @@ function install() {
     if (useLink) {
       try {
         symlinkSync(src, target, 'junction');
-      } catch (e) {
-        fail(`${d}：建链接失败（${e.code || e.message}），改用复制`);
+      } catch (err) {
+        fail(`${tag}${e.name}：建链接失败（${err.code || err.message}），改用复制`);
         cpSync(src, target, { recursive: true });
       }
     } else {
       cpSync(src, target, { recursive: true });
     }
-    ok(`${d}${useLink ? ' → ' + src : ''}`);
+    ok(`${tag}${e.name}${useLink ? ' → ' + src : ''}`);
     installed += 1;
   }
 
-  console.log(`\n完成：安装 ${installed} 个，跳过 ${dirs.length - installed} 个`);
+  console.log(`\n完成：安装 ${installed} 个，跳过 ${entries.length - installed} 个`);
   if (!useLink && installed) {
     console.log('提示：复制模式下改动本仓库不会自动同步，更新请重跑本脚本（加 --force）。');
   }
@@ -202,9 +247,10 @@ if (has('--help') || has('-h')) {
 }
 
 if (has('--list')) {
-  for (const d of listSkillDirs()) {
-    const r = checkSkill(d);
-    console.log(`${r.name}${r.version ? ' @' + r.version : ''}`);
+  for (const e of scanSkillDirs()) {
+    const r = checkSkill(e.name, e.dir);
+    const tag = e.origin === 'third-party' ? '[third-party] ' : '';
+    console.log(`${tag}${r.name}${r.version ? ' @' + r.version : ''}`);
     console.log(`  ${r.description.slice(0, 110)}${r.description.length > 110 ? '…' : ''}\n`);
   }
   process.exit(0);
