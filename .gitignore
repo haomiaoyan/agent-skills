@@ -1,0 +1,6 @@
+node_modules/
+.test-install/
+.test-link/
+.DS_Store
+Thumbs.db
+*.log
