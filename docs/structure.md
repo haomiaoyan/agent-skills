@@ -25,7 +25,20 @@ skills/<name>/
 | `description` 前缀 | 建议 `Use when...` | 不强制（不改原文） |
 | LICENSE | 由根目录 MIT 覆盖 | 该 vendor 目录内单独放一份原文 |
 
-判断依据是**版权归属**，不是文件来源。从别人仓库拉的、或来源查不到的，一律不放 `skills/`。来源无法确认的技能不要加 `license` / `author` 字段——写了就是伪造署名。
+判断依据是**版权归属**，不是文件来源。从别人仓库拉的一律不放 `skills/`；确属自己作品但此前来源未标注的，补上 `license` / `author` 后即可进 `skills/`。无法确认归属的，不要加 `license` / `author` 字段——写了就是伪造署名。
+
+### 转发壳（alias）
+
+转发壳是只含一句 `Call the Skill tool with "<实体名>".` 的技能，配合 `disable-model-invocation: true` 限制成只能由用户显式输入斜杠命令触发。
+
+```
+skills/<entity>/     ← 实体，有完整流程
+skills/<alias>/      ← 壳，指向实体
+```
+
+- 壳的 `disable-model-invocation` 必须写在 frontmatter 顶层（不是 `metadata` 里），否则不生效
+- 壳和实体必须同时安装，安装器不解析依赖
+- 壳也要写 `license` / `author`（它的版权归属与实体一致）
 
 ## SKILL.md 的 frontmatter
 

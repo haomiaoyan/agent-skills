@@ -1,11 +1,15 @@
 ---
 name: plan-sds-review
-description: Plan and SDS review workflow. Turn a rough idea into an independently reviewed plan, then a reviewed SDS, before any code is written.
+description: Use when a multi-file feature, refactor or redesign needs a reviewed plan and SDS before any code is written — eight-stage pipeline from requirement clarification through two adversarial reviews to a handoff document, with review prompts, failure-mode checklist and CDP measurement recipe.
+license: MIT
+metadata:
+  author: haomiaoyan
+  version: "1.0.0"
 ---
 
 # Plan & SDS Review Workflow
 
-A seven-stage pipeline for turning a rough idea into an implementation-ready spec. Built from the Synteny motion-layer project, where it found and fixed 32 defects before a single line of implementation code was written.
+An eight-stage pipeline for turning a rough idea into an implementation-ready spec: stages 1–7 produce the reviewed documents, stage 8 is the post-handoff implementation run in a fresh session. Built from the Synteny motion-layer project, where it found and fixed 32 defects before a single line of implementation code was written.
 
 ## When to use
 
