@@ -6,9 +6,12 @@
  *   node scripts/install.mjs                      # 复制安装到默认目录
  *   node scripts/install.mjs --dest <dir>         # 指定目标目录
  *   node scripts/install.mjs --link               # 用符号链接（改仓库即生效，需权限）
- *   node scripts/install.mjs --only a,b           # 只装指定技能
+ *   node scripts/install.mjs --only a,b           # 只装指定技能或分类（写分类名装整类）
  *   node scripts/install.mjs --force              # 覆盖已存在的同名技能
  *   node scripts/install.mjs --validate           # 只校验，不安装
+ *
+ * 自有技能分类存放：skills/<分类>/<技能名>/，分类见各分类下的 README.md。
+ * 安装时一律平铺到目标目录（目标运行时认的是技能名，不认分类）。
  *
  * 目标目录默认：Windows = %USERPROFILE%\.agents\skills，其它 = ~/.agents/skills
  * （.agents/skills 是跨运行时的通用技能目录；若你的运行时只认 ~/.claude/skills，
@@ -66,26 +69,44 @@ function listSkillDirs() {
 }
 
 /**
- * 扫描自有技能与第三方技能，返回 [{ name, dir, origin }]。
- * - skills/<name>/                       → origin: 'own'
+ * 扫描自有技能与第三方技能，返回 [{ name, dir, origin, category? }]。
+ * - skills/<name>/                       → origin: 'own'（兼容旧的平铺结构）
+ * - skills/<category>/<name>/             → origin: 'own', category=<category>
  * - third-party/<vendor>/skills/<name>/  → origin: 'third-party'
+ *
+ * 判定「这是技能目录」的依据是目录内含 SKILL.md，而不是层级位置：
+ * 分类目录（planning/ 等）只有 README.md，不会被误当成技能。
  * 同名时自有优先（安装到目标目录会发生冲突，第三方先被跳过并告警）。
  */
 function scanSkillDirs() {
   const out = [];
   const seen = new Set();
 
-  const push = (name, dir, origin) => {
+  const push = (name, dir, origin, category) => {
     if (seen.has(name)) return;
     seen.add(name);
-    out.push({ name, dir, origin });
+    out.push(category ? { name, dir, origin, category } : { name, dir, origin });
   };
 
   if (existsSync(SKILLS_DIR)) {
     readdirSync(SKILLS_DIR)
       .filter((d) => statSync(join(SKILLS_DIR, d)).isDirectory())
       .sort()
-      .forEach((d) => push(d, join(SKILLS_DIR, d), 'own'));
+      .forEach((d) => {
+        const dir = join(SKILLS_DIR, d);
+        if (existsSync(join(dir, 'SKILL.md'))) {
+          push(d, dir, 'own');                       // 旧的平铺技能
+        } else {
+          // 分类目录：逐个把含 SKILL.md 的子目录登记为技能
+          readdirSync(dir)
+            .filter((s) => statSync(join(dir, s)).isDirectory())
+            .sort()
+            .forEach((s) => {
+              const skillDir = join(dir, s);
+              if (existsSync(join(skillDir, 'SKILL.md'))) push(s, skillDir, 'own', d);
+            });
+        }
+      });
   }
 
   if (existsSync(THIRD_PARTY_DIR)) {
@@ -155,7 +176,7 @@ function validateAll(quiet = false) {
   let warned = 0;
   for (const e of entries) {
     const r = checkSkill(e.name, e.dir);
-    const tag = e.origin === 'third-party' ? '[third-party] ' : '';
+    const tag = e.origin === 'third-party' ? '[third-party] ' : e.category ? `[${e.category}] ` : '';
     if (r.problems.length) {
       bad += 1;
       fail(`${tag}${e.name}：${r.problems.join('；')}`);
@@ -197,12 +218,16 @@ function install() {
 
   let entries = scanSkillDirs();
   if (only) {
-    const missing = only.filter((n) => !entries.some((e) => e.name === n));
+    // --only 既能写技能名，也能写分类名（一次装整类）
+    const knownCategories = new Set(entries.map((e) => e.category).filter(Boolean));
+    const missing = only.filter(
+      (n) => !entries.some((e) => e.name === n || e.category === n) && !knownCategories.has(n),
+    );
     if (missing.length) {
-      fail(`--only 指定了不存在的技能：${missing.join(', ')}`);
+      fail(`--only 指定了不存在的技能或分类：${missing.join(', ')}`);
       return 1;
     }
-    entries = entries.filter((e) => only.includes(e.name));
+    entries = entries.filter((e) => only.includes(e.name) || (e.category && only.includes(e.category)));
   }
 
   mkdirSync(dest, { recursive: true });
@@ -212,7 +237,7 @@ function install() {
   for (const e of entries) {
     const src = e.dir;
     const target = join(dest, e.name);
-    const tag = e.origin === 'third-party' ? '[third-party] ' : '';
+    const tag = e.origin === 'third-party' ? '[third-party] ' : e.category ? `[${e.category}] ` : '';
     if (existsSync(target)) {
       if (!force) {
         warn(`${tag}${e.name}：目标已存在，跳过（加 --force 覆盖）`);
@@ -249,7 +274,7 @@ if (has('--help') || has('-h')) {
 if (has('--list')) {
   for (const e of scanSkillDirs()) {
     const r = checkSkill(e.name, e.dir);
-    const tag = e.origin === 'third-party' ? '[third-party] ' : '';
+    const tag = e.origin === 'third-party' ? '[third-party] ' : e.category ? `[${e.category}] ` : '';
     console.log(`${tag}${r.name}${r.version ? ' @' + r.version : ''}`);
     console.log(`  ${r.description.slice(0, 110)}${r.description.length > 110 ? '…' : ''}\n`);
   }

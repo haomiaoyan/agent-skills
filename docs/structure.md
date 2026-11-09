@@ -4,10 +4,34 @@
 
 ## 一个技能 = 一个目录
 
-自有技能放 `skills/<name>/`，第三方技能放 `third-party/<vendor>/skills/<name>/`。
+自有技能按「用在哪个阶段」分类存放，第三方技能按版权来源隔离：
 
 ```
-skills/<name>/
+skills/                              自有技能
+├── planning/                        立项与规划（写代码之前）
+│   ├── README.md                    分类说明
+│   ├── plan-sds-review/
+│   │   ├── SKILL.md
+│   │   └── references/
+│   └── plan-me/
+│       └── SKILL.md
+├── delivery/                        实施与交付（规格确定之后）
+│   ├── README.md
+│   └── visual-narrative-site/
+│       ├── SKILL.md
+│       ├── references/
+│       └── assets/
+├── verification/                    验收与验证（声称完成之前）
+│   ├── README.md
+│   └── web-acceptance-harness/
+│       └── SKILL.md
+└── third-party/                     第三方技能（在仓库外层，见下）
+```
+
+单个技能目录的结构：
+
+```
+<技能名>/
 ├── SKILL.md              必需
 ├── references/           可选，按需加载的长文档
 ├── assets/               可选，可直接复制的模板/骨架
@@ -16,24 +40,40 @@ skills/<name>/
 
 目录名用 kebab-case，且**必须与 frontmatter 的 `name` 完全一致**。校验脚本会检查这一点。
 
+### 分类规则
+
+| 分类 | 阶段 | 判定依据 |
+|---|---|---|
+| `planning/` | 写代码之前 | 产出是决策、计划、规格文档 |
+| `delivery/` | 规格确定之后 | 产出是可运行、可分批部署的实现 |
+| `verification/` | 声称完成之前 | 产出是脚本断言与实测证据 |
+
+**每个分类目录必须有一份 `README.md`**：写清本类有哪些技能、什么时候用、与其它分类怎么衔接。分类目录本身**不放 `SKILL.md`**——安装器靠「含 SKILL.md」判定技能目录，分类目录只有 README，不会被误装。
+
+**兼容平铺**：`skills/<技能名>/` 这种旧结构安装器仍认。确实跨阶段、或不属于任何一类的技能，可以平铺，但要在根 README 里说明原因。
+
+**分类只影响仓库组织，不影响安装结果**：安装时六个技能一律平铺到目标目录（运行时认技能名，不认分类）。`--only` 既接受技能名也接受分类名（`--only planning` 装整类）。
+
 ### 自有 vs 第三方的分界
 
 | | 自有 | 第三方 |
 |---|---|---|
-| 位置 | `skills/` | `third-party/<vendor>/skills/` |
+| 位置 | `skills/<分类>/<技能名>/` | `third-party/<vendor>/skills/<技能名>/` |
 | frontmatter | 需要 `license` / `metadata.author` | 保持上游原样，不改他人文案 |
 | `description` 前缀 | 建议 `Use when...` | 不强制（不改原文） |
 | LICENSE | 由根目录 MIT 覆盖 | 该 vendor 目录内单独放一份原文 |
 
-判断依据是**版权归属**，不是文件来源。从别人仓库拉的一律不放 `skills/`；确属自己作品但此前来源未标注的，补上 `license` / `author` 后即可进 `skills/`。无法确认归属的，不要加 `license` / `author` 字段——写了就是伪造署名。
+判断依据是**版权归属**，不是用途。第三方技能即使属于某个阶段（例如 `grilling` 属 planning），也不并入 `skills/planning/`，而是在该分类的 README 里注明「归类在本阶段但物理位置在别处」并给出路径。
+
+从别人仓库拉的一律不放 `skills/`；确属自己作品但此前来源未标注的，补上 `license` / `author` 后即可进 `skills/`。无法确认归属的，不要加 `license` / `author` 字段——写了就是伪造署名。
 
 ### 转发壳（alias）
 
 转发壳是只含一句 `Call the Skill tool with "<实体名>".` 的技能，配合 `disable-model-invocation: true` 限制成只能由用户显式输入斜杠命令触发。
 
 ```
-skills/<entity>/     ← 实体，有完整流程
-skills/<alias>/      ← 壳，指向实体
+skills/planning/<entity>/     ← 实体，有完整流程
+skills/planning/<alias>/      ← 壳，指向实体
 ```
 
 - 壳的 `disable-model-invocation` 必须写在 frontmatter 顶层（不是 `metadata` 里），否则不生效
