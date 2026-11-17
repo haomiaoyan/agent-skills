@@ -4,6 +4,23 @@
 
 **设计取向**：技能里只放「判据、阈值、实测数据、失效模式」，不放项目业务细节。凡是能写成一条脚本断言的，就不写成一句形容词。
 
+## 两套分类维度
+
+| 维度 | 位置 | 回答的问题 |
+|---|---|---|
+| 按阶段（主，物理） | `skills/planning/`、`delivery/`、`verification/` | 「什么时候用」 |
+| 按主题（次，逻辑） | [`topics/`](topics/README.md) | 「属于哪个领域」 |
+
+**主题不是物理文件夹**：一个技能目录无法同时位于 `delivery/` 和 `web-design/`，复制或软链接都会带来同步/跨平台问题。所以主题用 [`topics/catalog.json`](topics/catalog.json) 做索引，技能本体保持单份。一个技能可以挂多个主题。
+
+```bash
+node scripts/install.mjs --list-topics         # UI 设计 / 网页设计 / AI 绘图 / AI 视频 / 工程流程
+node scripts/install.mjs --topic web-design   # 装该主题下全部技能
+node scripts/install.mjs --topic workflow --only plan-sds-review   # 与 --only 取交集
+```
+
+`AI 绘图` 与 `AI 视频` 目前是**空类目**（如实记录，不是遗漏）：本仓库的方法论来自 NEUROATLAS 实战，那次没有用到图像/视频生成。两份 README 写清了本地已有的相关能力、未收录原因、以及以后怎么补。
+
 ## 一键安装
 
 ```bash
@@ -91,22 +108,7 @@ agent-skills/
 
 安装器同时遍历 `skills/<分类>/<技能>/` 和 `third-party/*/skills/`，对使用者没有区别；分目录只是为了让阶段归属与版权归属都清楚。
 
-## 两套分类维度
 
-| 维度 | 位置 | 回答的问题 |
-|---|---|---|
-| 按阶段（主，物理） | `skills/planning/`、`delivery/`、`verification/` | 「什么时候用」 |
-| 按主题（次，逻辑） | [`topics/`](topics/README.md) | 「属于哪个领域」 |
-
-**主题不是物理文件夹**：一个技能目录无法同时位于 `delivery/` 和 `web-design/`，复制或软链接都会带来同步/跨平台问题。所以主题用 [`topics/catalog.json`](topics/catalog.json) 做索引，技能本体保持单份。一个技能可以挂多个主题。
-
-```bash
-node scripts/install.mjs --list-topics         # UI 设计 / 网页设计 / AI 绘图 / AI 视频 / 工程流程
-node scripts/install.mjs --topic web-design   # 装该主题下全部技能
-node scripts/install.mjs --topic workflow --only plan-sds-review   # 与 --only 取交集
-```
-
-`AI 绘图` 与 `AI 视频` 目前是**空类目**（如实记录，不是遗漏）：本仓库的方法论来自 NEUROATLAS 实战，那次没有用到图像/视频生成。两份 README 写清了本地已有的相关能力、未收录原因、以及以后怎么补。
 
 ## 已有技能
 
